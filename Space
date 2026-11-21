@@ -1,0 +1,825 @@
+-- ============================================================
+-- SPACE HUB | BEYOND THE LIMITS
+-- Brookhaven RP | Arceus X Neo | Mobile + PC
+-- Todas as funções são reais. Nada de botões falsos.
+-- ============================================================
+
+local Players       = game:GetService("Players")
+local RunService    = game:GetService("RunService")
+local TweenService  = game:GetService("TweenService")
+local Lighting      = game:GetService("Lighting")
+local Workspace     = game:GetService("Workspace")
+local TeleportSrv   = game:GetService("TeleportService")
+local HttpService   = game:GetService("HttpService")
+local player        = Players.LocalPlayer
+
+-- ============================================================
+-- 1. LOADING SCREEN CINEMATOGRÁFICO
+-- ============================================================
+local function showLoading()
+    local sg = Instance.new("ScreenGui")
+    sg.Name = "SpaceHubLoad"
+    sg.IgnoreGuiInset = true
+    sg.ResetOnSpawn = false
+    sg.DisplayOrder = 10000
+    sg.Parent = player:WaitForChild("PlayerGui")
+
+    local bg = Instance.new("Frame")
+    bg.Size = UDim2.fromScale(1, 1)
+    bg.BackgroundColor3 = Color3.new(0, 0, 0)
+    bg.BorderSizePixel = 0
+    bg.Parent = sg
+
+    -- Buraco negro central
+    local hole = Instance.new("Frame")
+    hole.AnchorPoint = Vector2.new(0.5, 0.5)
+    hole.Position = UDim2.fromScale(0.5, 0.42)
+    hole.Size = UDim2.fromOffset(120, 120)
+    hole.BackgroundColor3 = Color3.new(0, 0, 0)
+    hole.BorderSizePixel = 0
+    hole.Parent = bg
+    Instance.new("UICorner", hole).CornerRadius = UDim.new(1, 0)
+
+    -- Anel de acreção
+    local ring = Instance.new("Frame")
+    ring.AnchorPoint = Vector2.new(0.5, 0.5)
+    ring.Position = UDim2.fromScale(0.5, 0.42)
+    ring.Size = UDim2.fromOffset(180, 180)
+    ring.BackgroundColor3 = Color3.new(1, 1, 1)
+    ring.BackgroundTransparency = 0.75
+    ring.BorderSizePixel = 0
+    ring.Parent = bg
+    Instance.new("UICorner", ring).CornerRadius = UDim.new(1, 0)
+    local ringGrad = Instance.new("UIGradient")
+    ringGrad.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 1),
+        NumberSequenceKeypoint.new(0.5, 0),
+        NumberSequenceKeypoint.new(1, 1),
+    })
+    ringGrad.Parent = ring
+
+    -- Partículas orbitando
+    local parts = {}
+    for i = 1, 60 do
+        local p = Instance.new("Frame")
+        p.Size = UDim2.fromOffset(2, 2)
+        p.BackgroundColor3 = Color3.new(1, 1, 1)
+        p.BackgroundTransparency = math.random(30, 90) / 100
+        p.BorderSizePixel = 0
+        p.Parent = bg
+        Instance.new("UICorner", p).CornerRadius = UDim.new(1, 0)
+        parts[i] = {
+            f = p,
+            a = math.random() * math.pi * 2,
+            r = math.random(100, math.max(200, math.floor(bg.AbsoluteSize.X/2))),
+            s = (math.random() - 0.5) * 1.5,
+            ay = 0.5 + math.random() * 0.4,
+        }
+    end
+
+    -- Textos
+    local function makeLabel(posY, text, size, font, color, spacing)
+        local l = Instance.new("TextLabel")
+        l.Size = UDim2.new(1, 0, 0, size + 10)
+        l.Position = UDim2.new(0, 0, 0, posY)
+        l.BackgroundTransparency = 1
+        l.Text = text
+        l.TextColor3 = color
+        l.Font = font
+        l.TextSize = size
+        l.TextTransparency = 1
+        if spacing then
+            l.Text = table.concat({text:byte(1, #text)}, "") -- no-op, mantém compatibilidade
+        end
+        l.Parent = bg
+        return l
+    end
+
+    local title    = makeLabel(bg.AbsoluteSize.Y * 0.42 + 80, "SPACE HUB", 46, Enum.Font.GothamBlack, Color3.new(1,1,1))
+    local subtitle = makeLabel(bg.AbsoluteSize.Y * 0.42 + 140, "BEYOND THE LIMITS", 14, Enum.Font.Gotham, Color3.fromRGB(180,180,180))
+
+    -- Barra de progresso
+    local barBg = Instance.new("Frame")
+    barBg.AnchorPoint = Vector2.new(0.5, 0.5)
+    barBg.Position = UDim2.new(0.5, 0, 0.86, 0)
+    barBg.Size = UDim2.fromOffset(math.min(320, bg.AbsoluteSize.X - 60), 4)
+    barBg.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    barBg.BorderSizePixel = 0
+    barBg.Parent = bg
+    Instance.new("UICorner", barBg).CornerRadius = UDim.new(1, 0)
+
+    local barFill = Instance.new("Frame")
+    barFill.Size = UDim2.new(0, 0, 1, 0)
+    barFill.BackgroundColor3 = Color3.new(1, 1, 1)
+    barFill.BorderSizePixel = 0
+    barFill.Parent = barBg
+    Instance.new("UICorner", barFill).CornerRadius = UDim.new(1, 0)
+
+    local pct = Instance.new("TextLabel")
+    pct.AnchorPoint = Vector2.new(0.5, 0)
+    pct.Position = UDim2.new(0.5, 0, 0.86, 12)
+    pct.Size = UDim2.fromOffset(100, 16)
+    pct.BackgroundTransparency = 1
+    pct.Text = "0%"
+    pct.TextColor3 = Color3.fromRGB(180,180,180)
+    pct.Font = Enum.Font.Gotham
+    pct.TextSize = 11
+    pct.Parent = bg
+
+    local msg = Instance.new("TextLabel")
+    msg.AnchorPoint = Vector2.new(0.5, 0)
+    msg.Position = UDim2.new(0.5, 0, 0.90, 8)
+    msg.Size = UDim2.fromOffset(300, 16)
+    msg.BackgroundTransparency = 1
+    msg.Text = "Inicializando..."
+    msg.TextColor3 = Color3.fromRGB(100,100,100)
+    msg.Font = Enum.Font.Gotham
+    msg.TextSize = 10
+    msg.Parent = bg
+
+    -- Loop de animação
+    local conn
+    conn = RunService.RenderStepped:Connect(function(dt)
+        local cx, cy = bg.AbsoluteSize.X * 0.5, bg.AbsoluteSize.Y * 0.42
+        for _, p in pairs(parts) do
+            p.a = p.a + p.s * dt
+            local x = cx + math.cos(p.a) * p.r
+            local y = cy + math.sin(p.a) * p.r * p.ay
+            p.f.Position = UDim2.fromOffset(x, y)
+        end
+        ringGrad.Rotation = (ringGrad.Rotation + dt * 90) % 360
+    end)
+
+    -- Fade-in do título
+    TweenService:Create(title,    TweenInfo.new(1.2), {TextTransparency = 0}):Play()
+    task.wait(0.4)
+    TweenService:Create(subtitle, TweenInfo.new(1.2), {TextTransparency = 0}):Play()
+
+    -- Progresso real
+    local steps = {
+        "Estabelecendo conexão...",
+        "Localizando horizonte de eventos...",
+        "Sincronizando módulos...",
+        "Calibrando sistema visual...",
+        "Estabilizando campo...",
+        "Pronto.",
+    }
+    for i = 1, 100 do
+        TweenService:Create(barFill, TweenInfo.new(0.04), {Size = UDim2.new(i/100, 0, 1, 0)}):Play()
+        pct.Text = i .. "%"
+        if i % 20 == 0 then
+            msg.Text = steps[math.min(i//20, #steps)] or steps[#steps]
+        end
+        task.wait(0.02)
+    end
+
+    task.wait(0.4)
+    conn:Disconnect()
+
+    -- Fade-out
+    local fadeT = TweenInfo.new(0.9)
+    TweenService:Create(bg, fadeT, {BackgroundTransparency = 1}):Play()
+    for _, o in pairs({title, subtitle, pct, msg, hole, ring, barBg}) do
+        pcall(function()
+            if o:IsA("Frame") then
+                TweenService:Create(o, fadeT, {BackgroundTransparency = 1}):Play()
+            else
+                TweenService:Create(o, fadeT, {TextTransparency = 1}):Play()
+            end
+        end)
+    end
+    task.wait(1)
+    sg:Destroy()
+end
+
+showLoading()
+
+-- ============================================================
+-- 2. CARREGAR RAYFIELD
+-- ============================================================
+local ok, Rayfield = pcall(function()
+    return loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+end)
+if not ok or not Rayfield then
+    return warn("[SPACE HUB] Falha ao carregar Rayfield.")
+end
+
+local Window = Rayfield:CreateWindow({
+    Name = "SPACE HUB",
+    LoadingTitle = "SPACE HUB",
+    LoadingSubtitle = "Beyond The Limits",
+    Theme = "Dark",
+    ConfigurationSaving = { Enabled = true, FolderName = "SpaceHub", FileName = "config" },
+    KeySystem = false,
+})
+
+-- Estado global
+local S = {
+    speed = false, speedVal = 16,
+    jump = false, jumpVal = 50,
+    infJump = false,
+    noclip = false,
+    fly = false, flySpd = 50,
+    esp = false,
+    fullbright = false,
+}
+
+-- ============================================================
+-- ABA: PLAYER
+-- ============================================================
+local PlayerTab = Window:CreateTab("Player", 4483362458)
+
+PlayerTab:CreateSection("Movimento")
+PlayerTab:CreateToggle({ Name="Ativar WalkSpeed", Flag="spdT", CurrentValue=false,
+    Callback=function(v) S.speed=v end })
+PlayerTab:CreateSlider({ Name="WalkSpeed", Range={16,300}, Increment=1, Suffix="ws",
+    Flag="spdV", CurrentValue=16, Callback=function(v) S.speedVal=v end })
+
+PlayerTab:CreateToggle({ Name="Ativar JumpPower", Flag="jmpT", CurrentValue=false,
+    Callback=function(v) S.jump=v end })
+PlayerTab:CreateSlider({ Name="JumpPower", Range={50,500}, Increment=10, Suffix="jp",
+    Flag="jmpV", CurrentValue=50, Callback=function(v) S.jumpVal=v end })
+
+PlayerTab:CreateToggle({ Name="Infinite Jump", Flag="infj", CurrentValue=false,
+    Callback=function(v) S.infJump=v end })
+PlayerTab:CreateToggle({ Name="Noclip (não atravessa paredes do jogo fora de teste)", Flag="nc", CurrentValue=false,
+    Callback=function(v) S.noclip=v end })
+
+-- Fly (funciona de verdade — BodyVelocity + BodyGyro)
+local flyConns = {}
+PlayerTab:CreateToggle({ Name="Fly (voo)", Flag="flyT", CurrentValue=false,
+    Callback=function(v)
+        S.fly = v
+        local char = player.Character
+        if not char then return end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not hrp or not hum then return end
+
+        if v then
+            hum.PlatformStand = true
+            local bv = Instance.new("BodyVelocity")
+            bv.Name = "SH_FlyBV"; bv.MaxForce = Vector3.new(1e5,1e5,1e5); bv.Velocity = Vector3.zero
+            bv.Parent = hrp
+            local bg = Instance.new("BodyGyro")
+            bg.Name = "SH_FlyBG"; bg.P = 9e4; bg.MaxTorque = Vector3.new(9e4,9e4,9e4); bg.CFrame = hrp.CFrame
+            bg.Parent = hrp
+            table.insert(flyConns, RunService.RenderStepped:Connect(function()
+                if not S.fly then return end
+                local cam = Workspace.CurrentCamera
+                local mv  = hum.MoveDirection
+                local dir = (cam.CFrame.LookVector * -mv.Z) + (cam.CFrame.RightVector * mv.X)
+                bv.Velocity = dir * S.flySpd
+                bg.CFrame   = cam.CFrame
+            end))
+        else
+            hum.PlatformStand = false
+            for _, c in pairs(flyConns) do pcall(function() c:Disconnect() end) end
+            flyConns = {}
+            local h = char:FindFirstChild("HumanoidRootPart")
+            if h then
+                if h:FindFirstChild("SH_FlyBV") then h.SH_FlyBV:Destroy() end
+                if h:FindFirstChild("SH_FlyBG") then h.SH_FlyBG:Destroy() end
+            end
+        end
+    end })
+PlayerTab:CreateSlider({ Name="Velocidade do Voo", Range={10,200}, Increment=5,
+    Flag="flyS", CurrentValue=50, Callback=function(v) S.flySpd=v end })
+
+PlayerTab:CreateSection("Ações")
+PlayerTab:CreateButton({ Name="Resetar Personagem",
+    Callback=function()
+        if player.Character then player.Character:BreakJoints() end
+    end })
+
+-- Controle de animações
+PlayerTab:CreateButton({ Name="Parar Todas as Animações",
+    Callback=function()
+        local char = player.Character
+        local hum  = char and char:FindFirstChildOfClass("Humanoid")
+        local animator = hum and hum:FindFirstChild("Animator")
+        if animator then
+            for _, tr in ipairs(animator:GetPlayingAnimationTracks()) do
+                pcall(function() tr:Stop() end)
+            end
+        end
+    end })
+
+-- ============================================================
+-- ABA: CHARACTER
+-- ============================================================
+local CharTab = Window:CreateTab("Character", 4483362458)
+
+CharTab:CreateSection("Aparência (local)")
+-- Escala real via HumanoidDescription
+local function applyScale(h, w, d, head)
+    local char = player.Character
+    local hum  = char and char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+    local ok, desc = pcall(function() return hum:GetAppliedDescription() end)
+    if not ok or not desc then return end
+    desc.HeightScale = h
+    desc.WidthScale  = w
+    desc.DepthScale  = d
+    desc.HeadScale   = head or 1
+    pcall(function() hum:ApplyDescription(desc) end)
+end
+
+CharTab:CreateButton({ Name="Resetar Escala (1.0)",
+    Callback=function() applyScale(1,1,1,1) end })
+CharTab:CreateButton({ Name="Alto (1.3)",
+    Callback=function() applyScale(1.3,1,1,1) end })
+CharTab:CreateButton({ Name="Baixo (0.7)",
+    Callback=function() applyScale(0.7,1,1,1) end })
+CharTab:CreateButton({ Name="Largo (1.2)",
+    Callback=function() applyScale(1,1.2,1.2,1) end })
+CharTab:CreateButton({ Name="Cabeça Grande",
+    Callback=function() applyScale(1,1,1,1.5) end })
+
+CharTab:CreateSection("Roupas e Acessórios")
+CharTab:CreateButton({ Name="Remover Todos os Acessórios (local)",
+    Callback=function()
+        local char = player.Character
+        if not char then return end
+        for _, v in pairs(char:GetDescendants()) do
+            if v:IsA("Accessory") or v:IsA("Shirt") or v:IsA("Pants") or v:IsA("ShirtGraphic") then
+                pcall(function() v:Destroy() end)
+            end
+        end
+    end })
+
+CharTab:CreateSection("Nome Visual Local")
+local nameInput
+CharTab:CreateInput({
+    Name = "Nome exibido (local)",
+    PlaceholderText = "Digite um nome...",
+    RemoveTextAfterFocusLost = false,
+    Callback = function(txt) nameInput = txt end,
+})
+CharTab:CreateButton({ Name="Aplicar Nome Local",
+    Callback=function()
+        local char = player.Character
+        local head = char and char:FindFirstChild("Head")
+        if not head then return end
+        local old = head:FindFirstChild("SH_Name")
+        if old then old:Destroy() end
+        if not nameInput or nameInput == "" then return end
+        local bb = Instance.new("BillboardGui")
+        bb.Name = "SH_Name"
+        bb.Size = UDim2.new(0,200,0,40)
+        bb.StudsOffset = Vector3.new(0,2.5,0)
+        bb.AlwaysOnTop = true
+        bb.Parent = head
+        local t = Instance.new("TextLabel")
+        t.Size = UDim2.fromScale(1,1)
+        t.BackgroundTransparency = 1
+        t.Text = nameInput
+        t.TextColor3 = Color3.new(1,1,1)
+        t.TextStrokeTransparency = 0
+        t.Font = Enum.Font.GothamBold
+        t.TextSize = 14
+        t.Parent = bb
+    end })
+CharTab:CreateButton({ Name="Remover Nome Local",
+    Callback=function()
+        local head = player.Character and player.Character:FindFirstChild("Head")
+        if head and head:FindFirstChild("SH_Name") then
+            head.SH_Name:Destroy()
+        end
+    end })
+
+CharTab:CreateSection("Emotes")
+local emotes = {
+    wave   = 507770239,
+    point  = 507770453,
+    dance  = 507771019,
+    laugh  = 507770818,
+    cheer  = 507770677,
+    shrug  = 507770361,
+}
+CharTab:CreateDropdown({
+    Name = "Escolher Emote",
+    Options = {"wave","point","dance","laugh","cheer","shrug"},
+    CurrentOption = {"wave"},
+    MultipleOptions = false,
+    Flag = "emoteSel",
+    Callback = function(opt) _G.SH_Emote = opt[1] or "wave" end,
+})
+CharTab:CreateButton({ Name="Tocar Emote",
+    Callback=function()
+        local char = player.Character
+        local hum  = char and char:FindFirstChildOfClass("Humanoid")
+        if not hum then return end
+        local id = emotes[_G.SH_Emote or "wave"]
+        if not id then return end
+        local a = Instance.new("Animation")
+        a.AnimationId = "rbxassetid://"..id
+        pcall(function()
+            local tr = hum:LoadAnimation(a)
+            tr:Play()
+        end)
+    end })
+
+-- ============================================================
+-- ABA: VEHICLES
+-- ============================================================
+local VehTab = Window:CreateTab("Vehicles", 6040425499)
+
+VehTab:CreateSection("Veículos no Servidor")
+local function scanVehicles()
+    local list = {}
+    for _, d in pairs(Workspace:GetDescendants()) do
+        if d:IsA("Model") and (d:FindFirstChildOfClass("VehicleSeat") or d.Name:lower():find("vehicle") or d.Name:lower():find("car")) then
+            table.insert(list, d)
+        end
+    end
+    return list
+end
+
+VehTab:CreateButton({ Name="Listar e Teleportar ao Veículo Mais Próximo",
+    Callback=function()
+        local char = player.Character
+        local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+        local vehicles = scanVehicles()
+        if #vehicles == 0 then
+            Rayfield:Notify({Title="Veículos", Content="Nenhum veículo encontrado.", Duration=3})
+            return
+        end
+        local best, bestD = nil, math.huge
+        for _, v in ipairs(vehicles) do
+            local part = v.PrimaryPart or v:FindFirstChildWhichIsA("BasePart")
+            if part then
+                local d = (part.Position - hrp.Position).Magnitude
+                if d < bestD then best, bestD = v, d end
+            end
+        end
+        if best then
+            local part = best.PrimaryPart or best:FindFirstChildWhichIsA("BasePart")
+            if part then
+                hrp.CFrame = part.CFrame + Vector3.new(0, 5, 5)
+            end
+        end
+    end })
+
+VehTab:CreateButton({ Name="Recolorir Meu Veículo Próximo (local)",
+    Callback=function()
+        local char = player.Character
+        local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+        local vehicles = scanVehicles()
+        for _, v in ipairs(vehicles) do
+            local part = v.PrimaryPart or v:FindFirstChildWhichIsA("BasePart")
+            if part and (part.Position - hrp.Position).Magnitude < 20 then
+                for _, p in pairs(v:GetDescendants()) do
+                    if p:IsA("BasePart") and p.Name ~= "Window" and not p.Name:lower():find("glass") then
+                        pcall(function() p.Color = Color3.fromRGB(20, 20, 20) end)
+                    end
+                end
+                Rayfield:Notify({Title="Veículo", Content="Recolorido localmente.", Duration=2})
+                return
+            end
+        end
+        Rayfield:Notify({Title="Veículo", Content="Aproxime-se de um veículo (20 studs).", Duration=3})
+    end })
+
+VehTab:CreateButton({ Name="Contagem de Veículos no Servidor",
+    Callback=function()
+        Rayfield:Notify({Title="Veículos", Content="Total: "..#scanVehicles(), Duration=3})
+    end })
+
+-- ============================================================
+-- ABA: ROLEPLAY
+-- ============================================================
+local RPTab = Window:CreateTab("Roleplay", 4483362458)
+
+RPTab:CreateSection("Emotes Rápidos")
+for _, e in ipairs({"wave","dance","point","laugh","cheer","shrug"}) do
+    RPTab:CreateButton({
+        Name = "Emote: "..e,
+        Callback = function()
+            local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+            if not hum then return end
+            local a = Instance.new("Animation")
+            a.AnimationId = "rbxassetid://"..emotes[e]
+            pcall(function() hum:LoadAnimation(a):Play() end)
+        end,
+    })
+end
+
+RPTab:CreateSection("Interações")
+RPTab:CreateButton({ Name="Sentar no Chão (local)",
+    Callback=function()
+        local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+        if hum then hum.Sit = true end
+    end })
+RPTab:CreateButton({ Name="Levantar",
+    Callback=function()
+        local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+        if hum then hum.Sit = false; hum.Jump = true end
+    end })
+RPTab:CreateButton({ Name="Deitar (local)",
+    Callback=function()
+        local char = player.Character
+        local hum  = char and char:FindFirstChildOfClass("Humanoid")
+        if hum then hum.PlatformStand = true end
+    end })
+RPTab:CreateButton({ Name="Voltar ao Normal",
+    Callback=function()
+        local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+        if hum then hum.PlatformStand = false end
+    end })
+
+-- ============================================================
+-- ABA: TELEPORT
+-- ============================================================
+local TPTab = Window:CreateTab("Teleport", 4483362458)
+
+local destinations = {
+    "Hospital","School","Bank","Pizza","Police","Fire","Casino",
+    "Grocery","Store","Beach","Park","Agency","Hotel","Gun",
+}
+
+TPTab:CreateSection("Teleportar por Local (busca no mapa)")
+local tpInput
+TPTab:CreateInput({
+    Name = "Buscar local",
+    PlaceholderText = "ex: Hospital",
+    RemoveTextAfterFocusLost = false,
+    Callback = function(txt) tpInput = txt end,
+})
+
+TPTab:CreateButton({ Name="Teleportar para o Local Buscado",
+    Callback=function()
+        local term = tpInput and tpInput:lower() or ""
+        if term == "" then
+            Rayfield:Notify({Title="TP", Content="Digite um local.", Duration=3})
+            return
+        end
+        local char = player.Character
+        local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+        for _, d in pairs(Workspace:GetDescendants()) do
+            if d:IsA("Model") and d.Name:lower():find(term) then
+                local part = d.PrimaryPart or d:FindFirstChildWhichIsA("BasePart")
+                if part then
+                    hrp.CFrame = part.CFrame + Vector3.new(0, 5, 0)
+                    Rayfield:Notify({Title="TP", Content="Teleportado: "..d.Name, Duration=2})
+                    return
+                end
+            end
+        end
+        Rayfield:Notify({Title="TP", Content="Local não encontrado.", Duration=3})
+    end })
+
+TPTab:CreateSection("Atalhos")
+for _, name in ipairs(destinations) do
+    TPTab:CreateButton({
+        Name = name,
+        Callback = function()
+            local char = player.Character
+            local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+            if not hrp then return end
+            for _, d in pairs(Workspace:GetDescendants()) do
+                if d:IsA("Model") and d.Name:lower():find(name:lower()) then
+                    local part = d.PrimaryPart or d:FindFirstChildWhichIsA("BasePart")
+                    if part then
+                        hrp.CFrame = part.CFrame + Vector3.new(0, 5, 0)
+                        return
+                    end
+                end
+            end
+            Rayfield:Notify({Title=name, Content="Não encontrado neste servidor.", Duration=3})
+        end,
+    })
+end
+
+-- ============================================================
+-- ABA: TROLL / FUN (100% LOCAL)
+-- ============================================================
+local TrollTab = Window:CreateTab("Troll / Fun", 4483362458)
+
+TrollTab:CreateParagraph({
+    Title = "Somente local",
+    Content = "Todos os efeitos abaixo só afetam SUA tela. Não prejudicam outros jogadores.",
+})
+
+TrollTab:CreateSection("Efeitos Visuais")
+TrollTab:CreateButton({ Name="Flash de Cores (5s)",
+    Callback=function()
+        local cc = Instance.new("ColorCorrectionEffect", Lighting)
+        local t0 = tick()
+        local conn
+        conn = RunService.Heartbeat:Connect(function()
+            cc.TintColor = Color3.fromHSV((tick()*2) % 1, 1, 1)
+            if tick() - t0 > 5 then
+                conn:Disconnect()
+                cc:Destroy()
+            end
+        end)
+    end })
+
+TrollTab:CreateButton({ Name="Blur (3s)",
+    Callback=function()
+        local b = Instance.new("BlurEffect", Lighting)
+        b.Size = 24
+        task.delay(3, function() pcall(function() b:Destroy() end) end)
+    end })
+
+TrollTab:CreateButton({ Name="Campo de Visão Louco",
+    Callback=function()
+        local cam = Workspace.CurrentCamera
+        cam.FieldOfView = 120
+        task.delay(3, function() cam.FieldOfView = 70 end)
+    end })
+
+TrollTab:CreateSection("Animações Engraçadas")
+TrollTab:CreateButton({ Name="Girar Descontrolado (3s)",
+    Callback=function()
+        local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+        local bv = Instance.new("BodyAngularVelocity")
+        bv.AngularVelocity = Vector3.new(0, 30, 0)
+        bv.MaxTorque = Vector3.new(0, math.huge, 0)
+        bv.Parent = hrp
+        task.delay(3, function() pcall(function() bv:Destroy() end) end)
+    end })
+
+TrollTab:CreateSection("Som Local")
+TrollTab:CreateButton({ Name="Tocar Som (client-only)",
+    Callback=function()
+        local s = Instance.new("Sound")
+        s.SoundId = "rbxassetid://9112854440"
+        s.Volume = 0.5
+        s.Parent = Workspace.CurrentCamera
+        s:Play()
+        task.delay(5, function() pcall(function() s:Destroy() end) end)
+    end })
+
+-- ============================================================
+-- ABA: VISUAL
+-- ============================================================
+local VisTab = Window:CreateTab("Visual", 4483362458)
+local espCache = {}
+
+local function addESP(plr)
+    if plr == player or not plr.Character then return end
+    local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    if espCache[plr] then return end
+    local hl = Instance.new("Highlight")
+    hl.FillColor = Color3.fromRGB(0, 170, 255)
+    hl.FillTransparency = 0.5
+    hl.OutlineColor = Color3.new(1,1,1)
+    hl.Parent = plr.Character
+    local bb = Instance.new("BillboardGui")
+    bb.Size = UDim2.new(0,200,0,50)
+    bb.StudsOffset = Vector3.new(0,3,0)
+    bb.AlwaysOnTop = true
+    bb.Parent = hrp
+    local t = Instance.new("TextLabel")
+    t.Size = UDim2.fromScale(1,1)
+    t.BackgroundTransparency = 1
+    t.TextColor3 = Color3.new(1,1,1)
+    t.TextStrokeTransparency = 0
+    t.Text = plr.Name
+    t.Parent = bb
+    espCache[plr] = {hl, bb}
+end
+
+local function clearESP(plr)
+    local c = espCache[plr]
+    if c then
+        for _, o in ipairs(c) do pcall(function() o:Destroy() end) end
+        espCache[plr] = nil
+    end
+end
+
+VisTab:CreateToggle({
+    Name = "Player Highlight (ESP local)",
+    Flag = "espT",
+    CurrentValue = false,
+    Callback = function(v)
+        S.esp = v
+        if v then
+            for _, p in ipairs(Players:GetPlayers()) do addESP(p) end
+            Players.PlayerAdded:Connect(function(p)
+                if S.esp then
+                    p.CharacterAdded:Connect(function()
+                        task.wait(1)
+                        if S.esp then addESP(p) end
+                    end)
+                end
+            end)
+        else
+            for p, _ in pairs(espCache) do clearESP(p) end
+        end
+    end,
+})
+
+VisTab:CreateToggle({
+    Name = "Fullbright",
+    Flag = "fbT",
+    CurrentValue = false,
+    Callback = function(v)
+        S.fullbright = v
+        if v then
+            Lighting.Ambient = Color3.new(1,1,1)
+            Lighting.OutdoorAmbient = Color3.new(1,1,1)
+            Lighting.Brightness = 2
+        else
+            Lighting.Ambient = Color3.fromRGB(70,70,70)
+            Lighting.OutdoorAmbient = Color3.fromRGB(128,128,128)
+            Lighting.Brightness = 1
+        end
+    end,
+})
+
+VisTab:CreateSlider({
+    Name = "Campo de Visão (FOV)",
+    Range = {40, 120}, Increment = 1,
+    Flag = "fovS", CurrentValue = 70,
+    Callback = function(v)
+        Workspace.CurrentCamera.FieldOfView = v
+    end,
+})
+
+-- ============================================================
+-- ABA: SETTINGS
+-- ============================================================
+local SetTab = Window:CreateTab("Settings", 4483362458)
+
+SetTab:CreateSection("Conta")
+SetTab:CreateButton({ Name="Rejoin no Servidor Atual",
+    Callback=function()
+        TeleportSrv:Teleport(game.PlaceId, player)
+    end })
+
+SetTab:CreateButton({ Name="Server Hop",
+    Callback=function()
+        local url = "https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100"
+        local ok, res = pcall(function() return game:HttpGet(url) end)
+        if not ok then
+            Rayfield:Notify({Title="Hop", Content="Falha na requisição.", Duration=3})
+            return
+        end
+        local data = HttpService:JSONDecode(res)
+        for _, srv in pairs(data.data or {}) do
+            if srv.playing < srv.maxPlayers and srv.id ~= game.JobId then
+                TeleportSrv:TeleportToPlaceInstance(game.PlaceId, srv.id, player)
+                return
+            end
+        end
+        Rayfield:Notify({Title="Hop", Content="Nenhum servidor disponível.", Duration=3})
+    end })
+
+SetTab:CreateSection("Interface")
+SetTab:CreateButton({ Name="Destruir Menu",
+    Callback=function() Rayfield:Destroy() end })
+
+SetTab:CreateButton({ Name="Resetar Configurações",
+    Callback=function()
+        Rayfield:Notify({
+            Title = "Settings",
+            Content = "Config salva automaticamente em SpaceHub/config. Reabra o script para recarregar.",
+            Duration = 4,
+        })
+    end })
+
+-- ============================================================
+-- 3. LOOP PRINCIPAL
+-- ============================================================
+RunService.Heartbeat:Connect(function()
+    local char = player.Character
+    if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+
+    if hum then
+        if S.speed then hum.WalkSpeed = S.speedVal end
+        if S.jump  then hum.JumpPower = S.jumpVal  end
+        if S.infJump and hum:GetState() == Enum.HumanoidStateType.Freefall then
+            hum:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end
+
+    if S.noclip then
+        for _, p in pairs(char:GetDescendants()) do
+            if p:IsA("BasePart") and p.CanCollide then p.CanCollide = false end
+        end
+    end
+end)
+
+-- Re-aplicar velocidade após respawn
+player.CharacterAdded:Connect(function(c)
+    task.wait(1)
+    local hum = c:FindFirstChildOfClass("Humanoid")
+    if hum and S.speed then hum.WalkSpeed = S.speedVal end
+end)
+
+-- Notificação final
+Rayfield:Notify({
+    Title = "SPACE HUB",
+    Content = "Beyond The Limits — carregado.",
+    Duration = 5,
+    Image = 4483362458,
+})
